@@ -1,30 +1,30 @@
 class Txt < Formula
   desc "Terminal text editor"
   homepage "https://github.com/ErikHellman/txt"
-  version "0.3.1"
+  version "0.4.0"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/ErikHellman/txt/releases/download/v0.3.1/txt-v0.3.1-aarch64-apple-darwin.tar.gz"
-      sha256 "aeab3ba4cd099ecd8011430e3320b22d8ac9c2343ed77ddd3350e35f3ab1252e"
+      url "https://github.com/ErikHellman/txt/releases/download/v0.4.0/txt-v0.4.0-aarch64-apple-darwin.tar.gz"
+      sha256 "959b6cea6d1e94912ea9ae4fe3feb59ad1b3d2fe356ce870cbefbef557147611"
     end
 
     on_intel do
-      url "https://github.com/ErikHellman/txt/releases/download/v0.3.1/txt-v0.3.1-x86_64-apple-darwin.tar.gz"
-      sha256 "03c088c0c14cc8d03d19705bc65a79a0d4e742d1474802da1d18be64f783e778"
+      url "https://github.com/ErikHellman/txt/releases/download/v0.4.0/txt-v0.4.0-x86_64-apple-darwin.tar.gz"
+      sha256 "0d031a2ed5515a476052dff356e80df71dd5d7b865a5c23df940f775a6b0257a"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/ErikHellman/txt/releases/download/v0.3.1/txt-v0.3.1-aarch64-unknown-linux-musl.tar.gz"
-      sha256 "099ec877b8a1038baf038b3bc7c59ca8cf9c6c6f64c12471695c2e682dcf1ea1"
+      url "https://github.com/ErikHellman/txt/releases/download/v0.4.0/txt-v0.4.0-aarch64-unknown-linux-musl.tar.gz"
+      sha256 "05fb73cfcd35b922482bbb49093cb0a49e363f365e4be27753545f77efb045df"
     end
 
     on_intel do
-      url "https://github.com/ErikHellman/txt/releases/download/v0.3.1/txt-v0.3.1-x86_64-unknown-linux-musl.tar.gz"
-      sha256 "33faa2e7a39379e2ba0cf1482ec5643ca5211f101ea08823e7bc460ec4e15c68"
+      url "https://github.com/ErikHellman/txt/releases/download/v0.4.0/txt-v0.4.0-x86_64-unknown-linux-musl.tar.gz"
+      sha256 "09981bce7b2b12aa9bdcd5390e4a95640d7b8e3d5d84291596be2355a9faec51"
     end
   end
 
