@@ -7,12 +7,13 @@ Per-formula algorithm:
   3. If the tag is newer, build new URLs by substituting the version into the existing
      URL templates (preserves musl/gnu/etc. without hardcoding).
   4. Download each new tarball, compute sha256.
-  5. Rewrite the formula in place, branch off as `bump/<name>-<version>`,
-     commit, push, and open a PR via `gh pr create`.
+  5. Rewrite the formula in place, commit, and push the bump straight to `main`.
 
 The script is intentionally tolerant: a failure on one formula is logged and the next
-formula is still attempted. Designed to run from a GitHub Actions workflow with
-GITHUB_TOKEN exported as GH_TOKEN, but also runs locally with `--dry-run`.
+formula is still attempted, but the process exits non-zero if any formula errored so a
+CI run surfaces the failure instead of completing green. Designed to run from a GitHub
+Actions workflow with GITHUB_TOKEN exported as GH_TOKEN, but also runs locally with
+`--dry-run`.
 """
 
 from __future__ import annotations
@@ -139,32 +140,16 @@ def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, check=True, capture_output=True, text=True, **kwargs)
 
 
-def remote_branch_exists(branch: str) -> bool:
-    result = subprocess.run(
-        ["git", "ls-remote", "--exit-code", "--heads", "origin", branch],
-        capture_output=True, text=True,
-    )
-    return result.returncode == 0
-
-
-def open_pr_for_bump(formula: FormulaInfo, new_version: str, dry_run: bool) -> None:
-    branch = f"bump/{formula.name}-{new_version}"
+def commit_and_push_bump(formula: FormulaInfo, new_version: str, dry_run: bool) -> None:
     title = f"Updated {formula.name.upper()} to {new_version}"
-    body = (
-        f"Automated bump of `{formula.name}` from {formula.version} to {new_version}.\n\n"
-        f"Upstream release: https://github.com/{formula.owner}/{formula.repo}/releases/tag/v{new_version}\n"
-    )
 
     if dry_run:
-        log(f"[{formula.name}] DRY RUN: would create branch {branch} and PR titled '{title}'")
+        log(f"[{formula.name}] DRY RUN: would commit '{title}' and push to main")
         return
 
-    run(["git", "checkout", "-B", branch])
     run(["git", "add", str(formula.path.relative_to(REPO_ROOT))])
     run(["git", "commit", "-m", title])
-    run(["git", "push", "--set-upstream", "origin", branch])
-    run(["gh", "pr", "create", "--title", title, "--body", body, "--base", "main", "--head", branch])
-    run(["git", "checkout", "-"])  # return to previous branch
+    run(["git", "push", "origin", "HEAD:main"])
 
 
 def process_formula(path: Path, dry_run: bool) -> bool:
@@ -181,39 +166,28 @@ def process_formula(path: Path, dry_run: bool) -> bool:
         log(f"[{info.name}] up to date at {info.version}")
         return False
 
-    branch = f"bump/{info.name}-{latest_version}"
-    if not dry_run and remote_branch_exists(branch):
-        log(f"[{info.name}] branch {branch} already exists on origin, skipping")
-        return False
-
     log(f"[{info.name}] bumping {info.version} -> {latest_version}")
 
     new_pairs: list[tuple[str, str]] = []
     for old_url, _old_sha in info.url_sha_pairs:
         new_url = build_new_url(old_url, info.version, latest_version)
         if latest_version not in new_url:
-            log(f"[{info.name}] could not substitute version into URL: {old_url}")
-            return False
-        try:
-            new_sha = fetch_sha256(new_url)
-        except Exception as exc:
-            log(f"[{info.name}] failed to download {new_url}: {exc}")
-            return False
+            raise RuntimeError(f"could not substitute version into URL: {old_url}")
+        new_sha = fetch_sha256(new_url)
         log(f"[{info.name}]   {new_url} -> {new_sha}")
         new_pairs.append((new_url, new_sha))
 
     original = path.read_text()
     updated = rewrite_formula(original, info.version, latest_version, new_pairs)
     if updated == original:
-        log(f"[{info.name}] rewrite produced no changes (regex mismatch?), skipping")
-        return False
+        raise RuntimeError("rewrite produced no changes (regex mismatch?)")
 
     if dry_run:
-        log(f"[{info.name}] DRY RUN: would rewrite {path.name} and open PR for branch {branch}")
+        log(f"[{info.name}] DRY RUN: would rewrite {path.name} and commit to main")
         return True
 
     path.write_text(updated)
-    open_pr_for_bump(info, latest_version, dry_run=False)
+    commit_and_push_bump(info, latest_version, dry_run=False)
     return True
 
 
@@ -233,17 +207,20 @@ def main() -> int:
         return 0
 
     bumped = 0
+    errors = 0
     for path in formulae:
         try:
             if process_formula(path, dry_run=args.dry_run):
                 bumped += 1
         except subprocess.CalledProcessError as exc:
+            errors += 1
             log(f"[{path.name}] git/gh command failed: {exc.stderr or exc}")
         except Exception as exc:
+            errors += 1
             log(f"[{path.name}] unexpected error: {exc}")
 
-    log(f"done, {bumped} formula(e) bumped")
-    return 0
+    log(f"done, {bumped} formula(e) bumped, {errors} error(s)")
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":
